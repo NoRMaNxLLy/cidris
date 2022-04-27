@@ -15,6 +15,7 @@ EOF
 
 shopt -s extglob
 # @_@ it's weired, i know. regex properly better.
+# man bash /pattern matching    to understand this @_@.
 ip_patr='@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5])'
 cidr_patr='@(?(/)?([0-2])[0-9]|3[0-2])'
 while [[ $# -gt 0 ]]; do
@@ -45,8 +46,11 @@ for octet in {0..3}; do
     Bin_bits+=${Bin_codes[${Dec_octets[$octet]}]}
 done
 
-# TODO: make a clever bin2dec converter
-# for i in ${!Bin_codes[@]};do Dec_codes[${Bin_codes[$i]}]=$i;done
+# a clever 8-bit bin2dec converter.
+# Dec_codes[binary] = decimal --> Dec_codes[00000010] = 2 -- this is much, much faster than bc(1) ^_^
+for i in ${!Bin_codes[@]}; do
+    Dec_codes[${Bin_codes[$i]}]=$i
+done
 
 host_bits=${Bin_bits:$(( 32 - H_bits )):32}
 network_bits=${Bin_bits:0:$cidr}
@@ -58,26 +62,35 @@ get_addr() {
     #broadcast, network, first and last usable addresses.
     #$1:    address name
     case $1 in
-        network_addr)   local host_bits=${host_bits//1/0}
-                        add=1 # to get the network address, turn all the host bits to 0. also get the first usable address
-                        ;;
-        broadcast_addr) local host_bits=${host_bits//0/1}
-                        add=-1 # to get the broadcast address, turn all the host bits to 1. also get the last usable address
-                        ;;
-        netmask)        local network_bits=${network_bits//0/1}
-                        host_bits=${host_bits//1/0}
-                        ;;
-        wildcard)       local network_bits=${network_bits//1/0}
-                        host_bits=${host_bits//0/1}
-                        ;;
+        network_addr)
+            local host_bits=${host_bits//1/0} # to get the network address, turn all the host bits to 0. also get the first usable address
+            add=1   # TODO: adding 1 to the network address gives the first usable address
+            ;;
+
+        broadcast_addr) 
+            local host_bits=${host_bits//0/1} # to get the broadcast address, turn all the host bits to 1. also get the last usable address
+            add=-1  # TODO: adding -1 to the broadcast address give the last usable address
+            ;;
+
+        netmask)
+            local network_bits=${network_bits//0/1}
+            local host_bits=${host_bits//1/0}
+            ;;
+
+        wildcard)
+            local network_bits=${network_bits//1/0}
+            local host_bits=${host_bits//0/1}
+            ;;
     esac
+
     local Bin_bits=${network_bits}${host_bits}
     local Dec_octets
+
     # i dont know how to do it properly without sed ;)
     Bin_bits=( $(echo $Bin_bits | sed -E 's/[01]{8}/& /g') )
     for octet in {0..3}; do
         Bin_octet=${Bin_bits[$octet]}
-        Dec_octets+=( $(echo  "obase=10;ibase=2;$Bin_octet" | bc) ) # bc is making the whole thing slower.
+        Dec_octets+=( ${Dec_codes[$Bin_octet]} ) # bc is making the whole thing slower.
     done
     #printf "$1:\t\t%d.%d.%d.%d\n" ${Dec_octets[@]}
     addresses+=( "$1" "${Dec_octets[@]}" )
