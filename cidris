@@ -90,7 +90,7 @@ get_addr() {
     Bin_bits=( $(echo $Bin_bits | sed -E 's/[01]{8}/& /g') )
     for octet in {0..3}; do
         Bin_octet=${Bin_bits[$octet]}
-        Dec_octets+=( ${Dec_codes[$Bin_octet]} ) # bc is making the whole thing slower.
+        Dec_octets+=( ${Dec_codes[$Bin_octet]} )
     done
     #printf "$1:\t\t%d.%d.%d.%d\n" ${Dec_octets[@]}
     addresses+=( "$1" "${Dec_octets[@]}" )
