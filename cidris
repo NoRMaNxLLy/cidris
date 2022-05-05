@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 usage() {
     while IFS= read -r line; do
         printf "%s\n" "$line"
@@ -12,6 +13,7 @@ EOF
 }
 
 [[ $# -eq 0 ]] && usage
+
 
 shopt -s extglob
 # @_@ it's weired, i know. regex properly better.
@@ -52,8 +54,8 @@ for i in ${!Bin_codes[@]}; do
     Dec_codes[${Bin_codes[$i]}]=$i
 done
 
-host_bits=${Bin_bits:$(( 32 - H_bits )):32}
 network_bits=${Bin_bits:0:$cidr}
+host_bits=${Bin_bits:$(( 32 - H_bits )):32}
 
 # store all the addresses in this array.
 addresses=()
@@ -61,15 +63,16 @@ addresses=()
 get_addr() {
     #broadcast, network, first and last usable addresses.
     #$1:    address name
-    case $1 in
+    local addr=$1
+    case $addr in
         network_addr)
             local host_bits=${host_bits//1/0} # to get the network address, turn all the host bits to 0. also get the first usable address
-            add=1   # TODO: adding 1 to the network address gives the first usable address
+            local add=1   # TODO: adding 1 to the network address gives the first usable address
             ;;
 
         broadcast_addr) 
             local host_bits=${host_bits//0/1} # to get the broadcast address, turn all the host bits to 1. also get the last usable address
-            add=-1  # TODO: adding -1 to the broadcast address give the last usable address
+            local add=-1  # TODO: adding -1 to the broadcast address give the last usable address
             ;;
 
         netmask)
@@ -87,13 +90,21 @@ get_addr() {
     local Dec_octets
 
     # i dont know how to do it properly without sed ;)
-    Bin_bits=( $(echo $Bin_bits | sed -E 's/[01]{8}/& /g') )
+    # Bin_bits=( $(echo $Bin_bits | sed -E 's/[01]{8}/& /g') )
+    Bin_bits=( ${Bin_bits:0:8} ${Bin_bits:8:8} ${Bin_bits:16:8} ${Bin_bits:24:8} ) # it might be ugly, but it's faster than sed. 
     for octet in {0..3}; do
         Bin_octet=${Bin_bits[$octet]}
         Dec_octets+=( ${Dec_codes[$Bin_octet]} )
     done
     #printf "$1:\t\t%d.%d.%d.%d\n" ${Dec_octets[@]}
-    addresses+=( "$1" "${Dec_octets[@]}" )
+    addresses+=( "$addr" "${Dec_octets[@]}" )
+
+    # getting the first and last usable addresses.
+    if [[ -n $add ]]; then
+        Dec_octets[3]=$(( Dec_octets[3] + add ))
+        (( add == 1 )) && addr="first_addr" || addr="last_addr"
+        addresses+=( "$addr" "${Dec_octets[@]}" ) 
+    fi
 }
 
 get_addr network_addr
