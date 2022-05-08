@@ -66,13 +66,13 @@ get_addr() {
     local addr=$1
     case $addr in
         network_addr)
-            local host_bits=${host_bits//1/0} # to get the network address, turn all the host bits to 0. also get the first usable address
-            local add=1   # TODO: adding 1 to the network address gives the first usable address
+            local host_bits=${host_bits//1/0} # to get the network address, turn all the host bits to 0
+            local add=1   # adding 1 to the network address gives the first usable address
             ;;
 
         broadcast_addr) 
-            local host_bits=${host_bits//0/1} # to get the broadcast address, turn all the host bits to 1. also get the last usable address
-            local add=-1  # TODO: adding -1 to the broadcast address give the last usable address
+            local host_bits=${host_bits//0/1} # to get the broadcast address, turn all the host bits to 1
+            local add=-1  # adding -1 to the broadcast address give the last usable address
             ;;
 
         netmask)
@@ -89,14 +89,11 @@ get_addr() {
     local Bin_bits=${network_bits}${host_bits}
     local Dec_octets
 
-    # i dont know how to do it properly without sed ;)
-    # Bin_bits=( $(echo $Bin_bits | sed -E 's/[01]{8}/& /g') )
     Bin_bits=( ${Bin_bits:0:8} ${Bin_bits:8:8} ${Bin_bits:16:8} ${Bin_bits:24:8} ) # it might be ugly, but it's faster than sed. 
     for octet in {0..3}; do
-        Bin_octet=${Bin_bits[$octet]}
-        Dec_octets+=( ${Dec_codes[$Bin_octet]} )
+        Bin_octet=${Bin_bits[$octet]} 
+        Dec_octets+=( ${Dec_codes[$Bin_octet]} ) # Ex: Dec_codes[00001111] --> 15
     done
-    #printf "$1:\t\t%d.%d.%d.%d\n" ${Dec_octets[@]}
     addresses+=( "$addr" "${Dec_octets[@]}" )
 
     # getting the first and last usable addresses.
