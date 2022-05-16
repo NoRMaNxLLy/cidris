@@ -1,62 +1,80 @@
 #!/bin/bash
 
-# TODO: change Dec_codes to Bin2Dec, and Bin_codes to Dec2Bin
-
-usage() {
+Usage() {
     while IFS= read -r line; do
         printf "%s\n" "$line"
     done <<- EOF
     Usage:
-    ${0##*/} IPV4/CIDR
-    ${0##*/} IPV4 /CIDR
+    ${0##*/} IPv4/Prefix    -->     192.168.1.0/24
+    ${0##*/} IPv4 DDN       -->     192.168.1.0 255.255.255.0
 EOF
     exit 1
 }
 
-[[ $# -eq 0 ]] && usage
+[[ $# -eq 0 ]] && Usage
 
 
 shopt -s extglob
+
 # @_@ it's weired, i know. regex properly better.
 # man bash /pattern matching    to understand this @_@.
-ip_patr='@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5])'
-cidr_patr='@(?(/)?([0-2])[0-9]|3[0-2])'
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        ${ip_patr}?(/${cidr_patr})) # in case of x.x.x.x or x.x.x.x/y
-            Ip_address=${1%/*}
-            [[ -z $cidr ]] && cidr=${1#*/}
-            ;;
-        ${cidr_patr})
-            cidr=${1#*/}
-            ;;
-        *)
-            usage
-    esac
-    shift
-done
+Ip_patr='@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5]).@(?([01])[0-9]?([0-9])|2[0-4][0-9]|25[0-5])'
+Prefix_patr='@(?(/)?([0-2])[0-9]|3[0-2])'
+DDN_patr='@(@(0|1@(28|92)|2@(24|40|48|52|54|55)).0.0.0|255.@(0|1@(28|92)|2@(24|40|48|52|54|55)).0.0|255.255.@(0|1@(28|92)|2@(24|40|48|52|54|55)).0|255.255.255.@(0|1@(28|92)|2@(24|40|48|52|54|55)))'
 
-# find the network bits and host bits
-N_bits=$cidr    # dah ! 0_0
-H_bits=$(( 32 - cidr ))
+if [[ $1 == $Ip_patr ]]; then
+    Ip_address=$1
+    if [[ $2 == $DDN_patr ]]; then
+        DDN_Mask=$2
+    else
+        Usage
+    fi
 
-# divide the ip to octets
-Dec_octets=( ${Ip_address//./ } )
+elif
+    [[ $1 == ${Ip_patr}/${Prefix_patr} ]]; then
+    Ip_address=${1%/*}
+    Prefix=${1#*/}
+
+else
+    Usage
+fi
 
 # a cool way to convert decimal to binary --> https://en.quoll.it/faq/convert-a-decimal-number-to-binary-from-bash/
 Dec2Bin=( {0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1} )
-for octet in {0..3}; do
-    Bin_bits+=${Dec2Bin[${Dec_octets[$octet]}]}
-done
 
-# a clever 8-bit bin2dec converter.
+# a clever 8-bit bin2dec converter (kinda).
 # Bin2Dec[binary] = decimal --> Bin2Dec[00000010] = 2 -- this is much, much faster than bc(1) ^_^
 for i in ${!Dec2Bin[@]}; do
     Bin2Dec[${Dec2Bin[$i]}]=$i
 done
 
-network_bits=${Bin_bits:0:$cidr}
-host_bits=${Bin_bits:$(( 32 - H_bits )):32}
+
+# if we have a DDN mask, convert it to /Prefix
+#{{{
+if [[ -n $DDN_Mask ]]; then
+    Dec_octets=( ${DDN_Mask//./ } )
+    for X in {0..3}; do
+        Bin_bits+=${Dec2Bin[${Dec_octets[$X]}]}
+    done
+    Prefix=${Bin_bits//0/}  # delete the 0's
+    Prefix=${#Prefix}   # how many 1's 
+fi
+#}}}
+
+# divide the ip to octets
+Dec_octets=( ${Ip_address//./ } )
+Bin_bits=
+for X in {0..3}; do
+    Bin_bits+=${Dec2Bin[${Dec_octets[$X]}]}
+done
+
+# find the network bits and host bits
+N=$Prefix  # dah ! 0_0
+H=$(( 32 - Prefix ))
+
+
+network_bits=${Bin_bits:0:$Prefix}
+host_bits=${Bin_bits:$(( 32 - H )):32}
 
 # store all the addresses in this array.
 addresses=()
@@ -93,7 +111,7 @@ get_addr() {
     Bin_bits=( ${Bin_bits:0:8} ${Bin_bits:8:8} ${Bin_bits:16:8} ${Bin_bits:24:8} ) # it might be ugly, but it's faster than sed. 
     for octet in {0..3}; do
         Bin_octet=${Bin_bits[$octet]} 
-        Dec_octets+=( ${Bin2Dec[$Bin_octet]} ) # Ex: Bin2Dec[00001111] --> 15
+        Dec_octets+=( ${Bin2Dec[$Bin_octet]} )  # Ex: Bin2Dec[00001111] --> 15
     done
     addresses+=( "$addr" "${Dec_octets[@]}" )
 
@@ -111,3 +129,4 @@ get_addr netmask
 get_addr wildcard
 
 printf "%s:\t\t%d.%d.%d.%d\n" ${addresses[@]}
+printf "Prefix:\t\t\t%s\n" "/$Prefix"
