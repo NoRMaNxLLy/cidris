@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# TODO: change Dec_codes to Bin2Dec, and Bin_codes to Dec2Bin
 
 usage() {
     while IFS= read -r line; do
@@ -43,15 +44,15 @@ H_bits=$(( 32 - cidr ))
 Dec_octets=( ${Ip_address//./ } )
 
 # a cool way to convert decimal to binary --> https://en.quoll.it/faq/convert-a-decimal-number-to-binary-from-bash/
-Bin_codes=( {0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1} )
+Dec2Bin=( {0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1} )
 for octet in {0..3}; do
-    Bin_bits+=${Bin_codes[${Dec_octets[$octet]}]}
+    Bin_bits+=${Dec2Bin[${Dec_octets[$octet]}]}
 done
 
 # a clever 8-bit bin2dec converter.
-# Dec_codes[binary] = decimal --> Dec_codes[00000010] = 2 -- this is much, much faster than bc(1) ^_^
-for i in ${!Bin_codes[@]}; do
-    Dec_codes[${Bin_codes[$i]}]=$i
+# Bin2Dec[binary] = decimal --> Bin2Dec[00000010] = 2 -- this is much, much faster than bc(1) ^_^
+for i in ${!Dec2Bin[@]}; do
+    Bin2Dec[${Dec2Bin[$i]}]=$i
 done
 
 network_bits=${Bin_bits:0:$cidr}
@@ -92,7 +93,7 @@ get_addr() {
     Bin_bits=( ${Bin_bits:0:8} ${Bin_bits:8:8} ${Bin_bits:16:8} ${Bin_bits:24:8} ) # it might be ugly, but it's faster than sed. 
     for octet in {0..3}; do
         Bin_octet=${Bin_bits[$octet]} 
-        Dec_octets+=( ${Dec_codes[$Bin_octet]} ) # Ex: Dec_codes[00001111] --> 15
+        Dec_octets+=( ${Bin2Dec[$Bin_octet]} ) # Ex: Bin2Dec[00001111] --> 15
     done
     addresses+=( "$addr" "${Dec_octets[@]}" )
 
