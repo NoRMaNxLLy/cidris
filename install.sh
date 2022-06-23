@@ -1,4 +1,6 @@
 #!/bin/bash
 
+DstDir="$HOME/.local/bin"
 cd  ${0%/*}
-cp cidris $HOME/.local/bin
+cp cidris $DstDir/cidris
+[[ -x $DstDir/cidris ]] || chmod +x $DstDir/cdiris
